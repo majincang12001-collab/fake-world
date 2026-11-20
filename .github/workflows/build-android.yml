@@ -1,0 +1,60 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.1.3 --activate
+
+      - name: Install project dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Add Capacitor Android tooling
+        run: pnpm add -w @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Build web app
+        run: pnpm run build:web
+
+      - name: Create Android wrapper
+        run: |
+          npx cap init "Fake World Demo" "com.majincang12001.fakeworld" --web-dir packages/web/dist
+          npx cap add android
+          npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fake-world-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
